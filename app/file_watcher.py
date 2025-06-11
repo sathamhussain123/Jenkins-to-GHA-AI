@@ -2,7 +2,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import requests, time, os
 
-WATCH_DIR = "/data/projects"
+WATCH_DIR = "/data/projects/auth-service/Jenkinsfile"
 
 class JenkinsfileHandler(FileSystemEventHandler):
     def on_modified(self, event):
