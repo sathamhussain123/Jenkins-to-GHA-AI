@@ -1,21 +1,94 @@
 pipeline {
     agent any
+
+    environment {
+        // Configure environment variables
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk-amd64'
+        MAVEN_HOME = '/usr/share/maven'
+        PATH = "$MAVEN_HOME/bin:$JAVA_HOME/bin:$PATH"
+        
+        // Docker & Deployment config
+        DOCKER_IMAGE = 'my-java-app'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'my-docker-registry.com'  // Optional (if pushing to a registry)
+    }
+
     stages {
+        // Stage 1: Checkout SCM (Git)
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/your-repo/your-java-app.git'
+            }
+        }
+
+        // Stage 2: Build with Maven
         stage('Build') {
             steps {
-                echo 'Building...'
+                sh 'mvn clean compile'
             }
         }
+
+        // Stage 3: Run Tests
         stage('Test') {
             steps {
-                echo 'Testing...'
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'  // Publish test results
+                }
             }
         }
-        stage('Deploy') {
+
+        // Stage 4: Package (JAR/WAR)
+        stage('Package') {
             steps {
-                echo 'Deploying...'
+                sh 'mvn package -DskipTests'  // Skip tests (already done)
+            }
+            post {
+                success {
+                    archiveArtifacts 'target/*.jar'  // Save the JAR/WAR file
+                }
+            }
+        }
+
+        // Stage 5: Build & Push Docker Image (Optional)
+        stage('Dockerize') {
+            when {
+                expression { env.DOCKER_REGISTRY != null }
+            }
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}", ".")
+                    docker.withRegistry('https://${DOCKER_REGISTRY}', 'docker-credentials') {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                    }
+                }
+            }
+        }
+
+        // Stage 6: Deploy (Example: Kubernetes/SSH)
+        stage('Deploy') {
+            when {
+                expression { env.DEPLOY_ENV == 'production' }
+            }
+            steps {
+                sh 'kubectl apply -f k8s-deployment.yaml'  // Example for Kubernetes
+                // OR use SSH:
+                // ssh user@server 'sudo systemctl restart my-java-app'
             }
         }
     }
-}
 
+    post {
+        always {
+            cleanWs()  // Clean workspace after build
+        }
+        success {
+            slackSend channel: '#devops', message: "✅ Build SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        failure {
+            slackSend channel: '#devops', message: "❌ Build FAILED - ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+    }
+}
