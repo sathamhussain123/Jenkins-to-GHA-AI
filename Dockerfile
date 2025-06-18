@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 🛠️ Add git
+# ✅ Add git (critical!)
 RUN apt-get update && apt-get install -y git && apt-get clean
 
 COPY app/ /app/
