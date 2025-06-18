@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+watchdog
+pyyaml
+requests
